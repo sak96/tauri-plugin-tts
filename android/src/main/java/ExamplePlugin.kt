@@ -10,14 +10,22 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Plugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
+import org.json.JSONArray
 import java.util.Locale
 import java.util.UUID
 
 @InvokeArg
 internal class SpeakArgs {
     lateinit var text: String
-    var language: String? = null
+    var rate: Float = 1.0f
 }
+
+data class TTSVoiceData(
+    val id: String,
+    val name: String,
+    val lang: String,
+    val disabled: Boolean = false
+)
 
 @TauriPlugin
 class ExamplePlugin(private val activity: Activity): Plugin(activity) {
@@ -53,24 +61,11 @@ class ExamplePlugin(private val activity: Activity): Plugin(activity) {
 
         try {
             val args = invoke.parseArgs(SpeakArgs::class.java)
-            
-            // Set language if provided
-            args.language?.let { lang ->
-                try {
-                    val locale = Locale(lang)
-                    val result = tts?.setLanguage(locale)
-                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        invoke.reject("Language not supported: $lang")
-                        return
-                    }
-                } catch (e: Exception) {
-                    invoke.reject("Invalid language code: $lang")
-                    return
-                }
-            }
-
             val utteranceId = UUID.randomUUID().toString()
-
+            tts?.apply {
+                setSpeechRate(args.rate)
+            }
+            args.rate
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     val event = JSObject()
@@ -103,6 +98,47 @@ class ExamplePlugin(private val activity: Activity): Plugin(activity) {
     fun stop(invoke: Invoke) {
         tts?.stop()
         invoke.resolve()
+    }
+
+    @Command
+    fun set_voice(invoke: Invoke) {
+        val voice = invoke.parseArgs(String::class.java)
+        try {
+            val voices = tts?.voices
+            val targetVoice = voices?.find { it.name == voice }
+            if (targetVoice != null) {
+                val result = tts?.setVoice(targetVoice)
+                if (result == TextToSpeech.SUCCESS) {
+                    invoke.resolve()
+                } else {
+                    invoke.reject("Failed to set voice: ${voice}")
+                }
+            } else {
+                invoke.reject("Voice not found: ${voice}")
+            }
+        } catch (e: Exception) {
+            invoke.reject("Exception setting voice: ${e.message}")
+        }
+    }
+
+    @Command
+    fun get_all_voices(invoke: Invoke) {
+        try {
+            val voices = tts?.voices?.map { voice ->
+                JSObject().apply {
+                    put("id", voice.name)
+                    put("name", voice.name)
+                    put("lang", voice.locale.toLanguageTag())
+                    put("disabled", false)
+                }
+            } ?: emptyList()
+            val result = JSObject().apply {
+                put("voices", JSONArray(voices))
+            }
+            invoke.resolve(result)
+        } catch (e: Exception) {
+            invoke.reject("Exception getting voices: ${e.message}")
+        }
     }
 
     // override fun destroy() {

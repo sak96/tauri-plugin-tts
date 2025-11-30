@@ -14,11 +14,19 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct Tts<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> Tts<R> {
-    pub fn speak(&self, text: String) -> crate::Result<()> {
-        Ok(())
+    pub fn speak(&self, text: SpeakArgs) -> crate::Result<()> {
+        Err(crate::Error::UnsupportedPlatformError)
     }
 
     pub fn stop(&self) -> crate::Result<()> {
-        Ok(())
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn set_voice(&self, _args: String) -> crate::Result<()> {
+        Err(crate::Error::UnsupportedPlatformError)
+    }
+
+    pub fn get_all_voices(&self) -> crate::Result<GetVoicesResponse> {
+        Err(crate::Error::UnsupportedPlatformError)
     }
 }
